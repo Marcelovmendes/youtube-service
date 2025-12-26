@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
+import java.util.Objects;
 
 @Repository
 public class RedisAuthStateRepository implements AuthStateRepository {
@@ -33,7 +34,7 @@ public class RedisAuthStateRepository implements AuthStateRepository {
                 state.codeChallenge()
             ));
             redisTemplate.opsForValue().set(key, value, timeout);
-            return Result.success(null);
+            return Result.successVoid();
         } catch (Exception e) {
             return Result.failure(Error.externalServiceError("Redis", "Failed to save auth state", e));
         }
@@ -61,11 +62,17 @@ public class RedisAuthStateRepository implements AuthStateRepository {
         try {
             String key = KEY_PREFIX + stateValue;
             redisTemplate.delete(key);
-            return Result.success(null);
+            return Result.successVoid();
         } catch (Exception e) {
             return Result.failure(Error.externalServiceError("Redis", "Failed to remove auth state", e));
         }
     }
 
-    private record StateData(String stateValue, String codeVerifier, String codeChallenge) {}
+    private record StateData(String stateValue, String codeVerifier, String codeChallenge) {
+        private StateData {
+            Objects.requireNonNull(stateValue, "stateValue");
+            Objects.requireNonNull(codeVerifier, "codeVerifier");
+            Objects.requireNonNull(codeChallenge, "codeChallenge");
+        }
+    }
 }

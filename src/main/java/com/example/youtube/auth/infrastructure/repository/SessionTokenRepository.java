@@ -31,7 +31,7 @@ public class SessionTokenRepository implements TokenRepository {
                 token.tokenType()
             );
             httpSession.setAttribute(TOKEN_SESSION_KEY, objectMapper.writeValueAsString(data));
-            return Result.success(null);
+            return Result.successVoid();
         } catch (Exception e) {
             return Result.failure(Error.externalServiceError("Session", "Failed to save token", e));
         }
@@ -57,7 +57,7 @@ public class SessionTokenRepository implements TokenRepository {
     public Result<Void, Error> remove(String sessionId) {
         try {
             httpSession.removeAttribute(TOKEN_SESSION_KEY);
-            return Result.success(null);
+            return Result.successVoid();
         } catch (Exception e) {
             return Result.failure(Error.externalServiceError("Session", "Failed to remove token", e));
         }

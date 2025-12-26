@@ -61,7 +61,7 @@ class GoogleAuthenticationServiceTest {
         void shouldSucceed() {
             var pkceChallenge = new PkceGenerator.PkceChallenge("verifier123", "challenge123");
             when(pkceGenerator.generate()).thenReturn(Result.success(pkceChallenge));
-            when(authStateRepository.save(any(AuthState.class), any(Duration.class))).thenReturn(Result.success(null));
+            when(authStateRepository.save(any(AuthState.class), any(Duration.class))).thenReturn(Result.successVoid());
             when(oauthClient.buildAuthorizationUrl(anyString(), eq("challenge123")))
                     .thenReturn(Result.success("https://accounts.google.com/auth?code_challenge=challenge123"));
 
@@ -107,7 +107,7 @@ class GoogleAuthenticationServiceTest {
         void shouldFailWhenBuildAuthorizationUrlFails() {
             var pkceChallenge = new PkceGenerator.PkceChallenge("verifier123", "challenge123");
             when(pkceGenerator.generate()).thenReturn(Result.success(pkceChallenge));
-            when(authStateRepository.save(any(AuthState.class), any(Duration.class))).thenReturn(Result.success(null));
+            when(authStateRepository.save(any(AuthState.class), any(Duration.class))).thenReturn(Result.successVoid());
             when(oauthClient.buildAuthorizationUrl(anyString(), anyString()))
                     .thenReturn(Result.failure(Error.externalServiceError("Google", "Invalid config", null)));
 
@@ -138,8 +138,8 @@ class GoogleAuthenticationServiceTest {
             when(httpSession.getId()).thenReturn("session123");
             when(authStateRepository.findByStateValue("state123")).thenReturn(Result.success(validAuthState));
             when(oauthClient.exchangeCodeForToken("code123", "verifier123")).thenReturn(Result.success(validToken));
-            when(authStateRepository.remove("state123")).thenReturn(Result.success(null));
-            when(tokenRepository.save("session123", validToken)).thenReturn(Result.success(null));
+            when(authStateRepository.remove("state123")).thenReturn(Result.successVoid());
+            when(tokenRepository.save("session123", validToken)).thenReturn(Result.successVoid());
 
             var request = new AuthUseCase.AuthCallbackRequest("code123", "state123");
             var result = authenticationService.handleCallback(request);
@@ -204,7 +204,7 @@ class GoogleAuthenticationServiceTest {
             when(httpSession.getId()).thenReturn("session123");
             when(authStateRepository.findByStateValue("state123")).thenReturn(Result.success(validAuthState));
             when(oauthClient.exchangeCodeForToken("code123", "verifier123")).thenReturn(Result.success(validToken));
-            when(authStateRepository.remove("state123")).thenReturn(Result.success(null));
+            when(authStateRepository.remove("state123")).thenReturn(Result.successVoid());
             when(tokenRepository.save("session123", validToken))
                     .thenReturn(Result.failure(Error.externalServiceError("Session", "Session expired", null)));
 
@@ -227,7 +227,7 @@ class GoogleAuthenticationServiceTest {
 
             when(tokenRepository.findBySessionId("session123")).thenReturn(Result.success(oldToken));
             when(oauthClient.refreshToken("refresh123")).thenReturn(Result.success(newToken));
-            when(tokenRepository.save("session123", newToken)).thenReturn(Result.success(null));
+            when(tokenRepository.save("session123", newToken)).thenReturn(Result.successVoid());
 
             var result = authenticationService.refreshToken("session123");
 
