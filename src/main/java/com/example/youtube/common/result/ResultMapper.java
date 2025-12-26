@@ -40,6 +40,7 @@ public final class ResultMapper {
             case Error.ResourceNotFoundError _ -> HttpStatus.NOT_FOUND;
             case Error.InvalidInputError _ -> HttpStatus.BAD_REQUEST;
             case Error.ExternalServiceError _ -> HttpStatus.SERVICE_UNAVAILABLE;
+            case Error.QuotaExceededError _ -> HttpStatus.TOO_MANY_REQUESTS;
         };
     }
 
@@ -57,6 +58,8 @@ public final class ResultMapper {
                 new ErrorDTO("INVALID_INPUT", message, "Field: " + field);
             case Error.ResourceNotFoundError(var resource, var identifier) ->
                 new ErrorDTO("RESOURCE_NOT_FOUND", resource + " not found", "ID: " + identifier);
+            case Error.QuotaExceededError(var currentUsage, var dailyLimit) ->
+                new ErrorDTO("QUOTA_EXCEEDED", "YouTube API quota exceeded", "Usage: " + currentUsage + "/" + dailyLimit);
         };
     }
 

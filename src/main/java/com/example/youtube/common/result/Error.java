@@ -6,7 +6,8 @@ public sealed interface Error permits
     Error.TokenExchangeError,
     Error.ExternalServiceError,
     Error.InvalidInputError,
-    Error.ResourceNotFoundError {
+    Error.ResourceNotFoundError,
+    Error.QuotaExceededError {
 
     record AuthenticationError(String message, String details) implements Error {}
     record InvalidStateError(String message) implements Error {}
@@ -14,6 +15,7 @@ public sealed interface Error permits
     record ExternalServiceError(String service, String message, Throwable cause) implements Error {}
     record InvalidInputError(String field, String message) implements Error {}
     record ResourceNotFoundError(String resource, String identifier) implements Error {}
+    record QuotaExceededError(long currentUsage, long dailyLimit) implements Error {}
 
     static AuthenticationError authenticationError(String message, String details) {
         return new AuthenticationError(message, details);
@@ -37,5 +39,9 @@ public sealed interface Error permits
 
     static ResourceNotFoundError resourceNotFoundError(String resource, String identifier) {
         return new ResourceNotFoundError(resource, identifier);
+    }
+
+    static QuotaExceededError quotaExceededError(long currentUsage, long dailyLimit) {
+        return new QuotaExceededError(currentUsage, dailyLimit);
     }
 }

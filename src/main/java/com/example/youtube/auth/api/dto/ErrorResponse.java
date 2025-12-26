@@ -18,6 +18,8 @@ public record ErrorResponse(String type, String message, String details) {
                 new ErrorResponse("INVALID_INPUT", message, "Field: " + field);
             case Error.ResourceNotFoundError(var resource, var identifier) ->
                 new ErrorResponse("RESOURCE_NOT_FOUND", resource + " not found", "ID: " + identifier);
+            case Error.QuotaExceededError(var currentUsage, var dailyLimit) ->
+                new ErrorResponse("QUOTA_EXCEEDED", "YouTube API quota exceeded", "Usage: " + currentUsage + "/" + dailyLimit);
         };
     }
 }
