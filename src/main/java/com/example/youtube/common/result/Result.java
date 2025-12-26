@@ -1,5 +1,6 @@
 package com.example.youtube.common.result;
 
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -10,10 +11,16 @@ public sealed interface Result<T, E> permits Result.Success, Result.Failure {
     record Failure<T, E>(E error) implements Result<T, E> {}
 
     static <T, E> Result<T, E> success(T value) {
+        Objects.requireNonNull(value, "success value cannot be null, use successVoid() for Void results");
         return new Success<>(value);
     }
 
+    static <E> Result<Void, E> successVoid() {
+        return new Success<>(null);
+    }
+
     static <T, E> Result<T, E> failure(E error) {
+        Objects.requireNonNull(error, "failure error cannot be null");
         return new Failure<>(error);
     }
 
