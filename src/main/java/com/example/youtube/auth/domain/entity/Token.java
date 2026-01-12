@@ -32,6 +32,10 @@ public final class Token {
         return Result.success(new Token(accessToken, refreshToken, expiresAt, tokenType));
     }
 
+    public static Token fromAccessToken(String accessToken) {
+        return new Token(accessToken, null, Instant.now().plusSeconds(3600), "Bearer");
+    }
+
     public boolean isExpired() {
         return Instant.now().isAfter(expiresAt);
     }

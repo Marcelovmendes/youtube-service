@@ -44,4 +44,16 @@ public sealed interface Error permits
     static QuotaExceededError quotaExceededError(long currentUsage, long dailyLimit) {
         return new QuotaExceededError(currentUsage, dailyLimit);
     }
+
+    default String message() {
+        return switch (this) {
+            case AuthenticationError e -> e.message();
+            case InvalidStateError e -> e.message();
+            case TokenExchangeError e -> e.message();
+            case ExternalServiceError e -> e.message();
+            case InvalidInputError e -> e.message();
+            case ResourceNotFoundError e -> "Resource not found: " + e.resource();
+            case QuotaExceededError e -> "Quota exceeded: " + e.currentUsage() + "/" + e.dailyLimit();
+        };
+    }
 }
