@@ -1,7 +1,7 @@
 package com.example.youtube.search.application.impl;
 
+import com.example.youtube.auth.application.TokenQuery;
 import com.example.youtube.auth.domain.entity.Token;
-import com.example.youtube.auth.domain.repository.TokenRepository;
 import com.example.youtube.common.result.Error;
 import com.example.youtube.common.result.Result;
 import com.example.youtube.playlist.domain.entity.VideoId;
@@ -19,7 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -29,7 +28,7 @@ import static org.mockito.Mockito.when;
 class SearchServiceTest {
 
     @Mock
-    private TokenRepository tokenRepository;
+    private TokenQuery tokenQuery;
 
     @Mock
     private YouTubeSearchPort youtubeSearchPort;
@@ -39,12 +38,11 @@ class SearchServiceTest {
 
     private SearchService searchService;
 
-    private static final String SESSION_ID = "test-session-id";
     private static final String ACCESS_TOKEN = "valid-access-token";
 
     @BeforeEach
     void setUp() {
-        searchService = new SearchService(tokenRepository, youtubeSearchPort, quotaService);
+        searchService = new SearchService(tokenQuery, youtubeSearchPort, quotaService);
     }
 
     private Token createValidToken() {
@@ -69,13 +67,13 @@ class SearchServiceTest {
                     0.9
             );
 
-            when(tokenRepository.findBySessionId(SESSION_ID)).thenReturn(Result.success(token));
+            when(tokenQuery.getCurrentUserToken()).thenReturn(Result.success(token));
             when(quotaService.consumeQuota(QuotaService.SEARCH_LIST_COST)).thenReturn(Result.successVoid());
             when(youtubeSearchPort.searchVideos(ACCESS_TOKEN, "test query", 10))
                     .thenReturn(Result.success(List.of(result1)));
 
             var request = new SearchUseCase.SearchRequest("test query", 10);
-            Result<List<SearchResult>, Error> result = searchService.searchVideos(SESSION_ID, request);
+            Result<List<SearchResult>, Error> result = searchService.searchVideos(request);
 
             assertThat(result.isSuccess()).isTrue();
             result.fold(
@@ -107,13 +105,13 @@ class SearchServiceTest {
                     0.8
             );
 
-            when(tokenRepository.findBySessionId(SESSION_ID)).thenReturn(Result.success(token));
+            when(tokenQuery.getCurrentUserToken()).thenReturn(Result.success(token));
             when(quotaService.consumeQuota(QuotaService.SEARCH_LIST_COST)).thenReturn(Result.successVoid());
             when(youtubeSearchPort.searchVideos(ACCESS_TOKEN, "test query", 10))
                     .thenReturn(Result.success(List.of(officialVideo, coverVideo)));
 
             var request = new SearchUseCase.SearchRequest("test query", 10);
-            Result<List<SearchResult>, Error> result = searchService.searchVideos(SESSION_ID, request);
+            Result<List<SearchResult>, Error> result = searchService.searchVideos(request);
 
             assertThat(result.isSuccess()).isTrue();
             result.fold(
@@ -129,7 +127,7 @@ class SearchServiceTest {
         @Test
         void failsForBlankQuery() {
             var request = new SearchUseCase.SearchRequest("   ", 10);
-            Result<List<SearchResult>, Error> result = searchService.searchVideos(SESSION_ID, request);
+            Result<List<SearchResult>, Error> result = searchService.searchVideos(request);
 
             assertThat(result.isFailure()).isTrue();
             result.fold(
@@ -140,18 +138,18 @@ class SearchServiceTest {
                         return null;
                     }
             );
-            verify(tokenRepository, never()).findBySessionId(any());
+            verify(tokenQuery, never()).getCurrentUserToken();
         }
 
         @Test
         void failsWhenQuotaExceeded() {
             Token token = createValidToken();
-            when(tokenRepository.findBySessionId(SESSION_ID)).thenReturn(Result.success(token));
+            when(tokenQuery.getCurrentUserToken()).thenReturn(Result.success(token));
             when(quotaService.consumeQuota(QuotaService.SEARCH_LIST_COST))
                     .thenReturn(Result.failure(Error.quotaExceededError(10000, 10000)));
 
             var request = new SearchUseCase.SearchRequest("test query", 10);
-            Result<List<SearchResult>, Error> result = searchService.searchVideos(SESSION_ID, request);
+            Result<List<SearchResult>, Error> result = searchService.searchVideos(request);
 
             assertThat(result.isFailure()).isTrue();
             result.fold(
@@ -179,13 +177,13 @@ class SearchServiceTest {
                     0.95
             );
 
-            when(tokenRepository.findBySessionId(SESSION_ID)).thenReturn(Result.success(token));
+            when(tokenQuery.getCurrentUserToken()).thenReturn(Result.success(token));
             when(quotaService.consumeQuota(QuotaService.SEARCH_LIST_COST)).thenReturn(Result.successVoid());
             when(youtubeSearchPort.searchMusicVideo(ACCESS_TOKEN, "Never Gonna Give You Up", "Rick Astley"))
                     .thenReturn(Result.success(result1));
 
             var request = new SearchUseCase.MusicSearchRequest("Never Gonna Give You Up", "Rick Astley");
-            Result<SearchResult, Error> result = searchService.searchMusicVideo(SESSION_ID, request);
+            Result<SearchResult, Error> result = searchService.searchMusicVideo(request);
 
             assertThat(result.isSuccess()).isTrue();
             result.fold(
@@ -200,7 +198,7 @@ class SearchServiceTest {
         @Test
         void failsForBlankTrackName() {
             var request = new SearchUseCase.MusicSearchRequest("", "Artist");
-            Result<SearchResult, Error> result = searchService.searchMusicVideo(SESSION_ID, request);
+            Result<SearchResult, Error> result = searchService.searchMusicVideo(request);
 
             assertThat(result.isFailure()).isTrue();
             result.fold(
@@ -216,7 +214,7 @@ class SearchServiceTest {
         @Test
         void failsForBlankArtistName() {
             var request = new SearchUseCase.MusicSearchRequest("Song", "   ");
-            Result<SearchResult, Error> result = searchService.searchMusicVideo(SESSION_ID, request);
+            Result<SearchResult, Error> result = searchService.searchMusicVideo(request);
 
             assertThat(result.isFailure()).isTrue();
             result.fold(

@@ -4,12 +4,10 @@ import com.example.youtube.auth.application.AuthUseCase;
 import com.example.youtube.auth.domain.entity.AuthState;
 import com.example.youtube.auth.domain.entity.Token;
 import com.example.youtube.auth.domain.repository.AuthStateRepository;
-import com.example.youtube.auth.domain.repository.TokenRepository;
 import com.example.youtube.auth.domain.service.OAuthClient;
 import com.example.youtube.auth.domain.service.PkceGenerator;
 import com.example.youtube.common.result.Error;
 import com.example.youtube.common.result.Result;
-import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,16 +28,10 @@ class GoogleAuthenticationServiceTest {
     private AuthStateRepository authStateRepository;
 
     @Mock
-    private TokenRepository tokenRepository;
-
-    @Mock
     private OAuthClient oauthClient;
 
     @Mock
     private PkceGenerator pkceGenerator;
-
-    @Mock
-    private HttpSession httpSession;
 
     private GoogleAuthenticationService authenticationService;
 
@@ -47,10 +39,8 @@ class GoogleAuthenticationServiceTest {
     void setUp() {
         authenticationService = new GoogleAuthenticationService(
                 authStateRepository,
-                tokenRepository,
                 oauthClient,
-                pkceGenerator,
-                httpSession
+                pkceGenerator
         );
     }
 
@@ -120,7 +110,7 @@ class GoogleAuthenticationServiceTest {
     }
 
     @Nested
-    class HandleCallback {
+    class ExchangeCodeForToken {
 
         private AuthState validAuthState;
         private Token validToken;
@@ -135,14 +125,12 @@ class GoogleAuthenticationServiceTest {
 
         @Test
         void shouldSucceed() {
-            when(httpSession.getId()).thenReturn("session123");
             when(authStateRepository.findByStateValue("state123")).thenReturn(Result.success(validAuthState));
             when(oauthClient.exchangeCodeForToken("code123", "verifier123")).thenReturn(Result.success(validToken));
             when(authStateRepository.remove("state123")).thenReturn(Result.successVoid());
-            when(tokenRepository.save("session123", validToken)).thenReturn(Result.successVoid());
 
             var request = new AuthUseCase.AuthCallbackRequest("code123", "state123");
-            var result = authenticationService.handleCallback(request);
+            var result = authenticationService.exchangeCodeForToken(request);
 
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.fold(Token::accessToken, err -> null)).isEqualTo("access123");
@@ -150,7 +138,6 @@ class GoogleAuthenticationServiceTest {
             verify(authStateRepository).findByStateValue("state123");
             verify(oauthClient).exchangeCodeForToken("code123", "verifier123");
             verify(authStateRepository).remove("state123");
-            verify(tokenRepository).save("session123", validToken);
         }
 
         @Test
@@ -159,12 +146,12 @@ class GoogleAuthenticationServiceTest {
                     .thenReturn(Result.failure(Error.resourceNotFoundError("AuthState", "invalidState")));
 
             var request = new AuthUseCase.AuthCallbackRequest("code123", "invalidState");
-            var result = authenticationService.handleCallback(request);
+            var result = authenticationService.exchangeCodeForToken(request);
 
             assertThat(result.isFailure()).isTrue();
             Error error = result.fold(success -> null, err -> err);
             assertThat(error).isInstanceOf(Error.ResourceNotFoundError.class);
-            verifyNoInteractions(oauthClient, tokenRepository);
+            verifyNoInteractions(oauthClient);
         }
 
         @Test
@@ -174,13 +161,12 @@ class GoogleAuthenticationServiceTest {
                     .thenReturn(Result.failure(Error.tokenExchangeError("Invalid code", "Code expired")));
 
             var request = new AuthUseCase.AuthCallbackRequest("code123", "state123");
-            var result = authenticationService.handleCallback(request);
+            var result = authenticationService.exchangeCodeForToken(request);
 
             assertThat(result.isFailure()).isTrue();
             Error error = result.fold(success -> null, err -> err);
             assertThat(error).isInstanceOf(Error.TokenExchangeError.class);
             verify(authStateRepository, never()).remove(anyString());
-            verifyNoInteractions(tokenRepository);
         }
 
         @Test
@@ -191,106 +177,7 @@ class GoogleAuthenticationServiceTest {
                     .thenReturn(Result.failure(Error.externalServiceError("Redis", "Connection lost", null)));
 
             var request = new AuthUseCase.AuthCallbackRequest("code123", "state123");
-            var result = authenticationService.handleCallback(request);
-
-            assertThat(result.isFailure()).isTrue();
-            Error error = result.fold(success -> null, err -> err);
-            assertThat(error).isInstanceOf(Error.ExternalServiceError.class);
-            verifyNoInteractions(tokenRepository);
-        }
-
-        @Test
-        void shouldFailWhenSaveTokenFails() {
-            when(httpSession.getId()).thenReturn("session123");
-            when(authStateRepository.findByStateValue("state123")).thenReturn(Result.success(validAuthState));
-            when(oauthClient.exchangeCodeForToken("code123", "verifier123")).thenReturn(Result.success(validToken));
-            when(authStateRepository.remove("state123")).thenReturn(Result.successVoid());
-            when(tokenRepository.save("session123", validToken))
-                    .thenReturn(Result.failure(Error.externalServiceError("Session", "Session expired", null)));
-
-            var request = new AuthUseCase.AuthCallbackRequest("code123", "state123");
-            var result = authenticationService.handleCallback(request);
-
-            assertThat(result.isFailure()).isTrue();
-            Error error = result.fold(success -> null, err -> err);
-            assertThat(error).isInstanceOf(Error.ExternalServiceError.class);
-        }
-    }
-
-    @Nested
-    class RefreshToken {
-
-        @Test
-        void shouldSucceed() {
-            var oldToken = Token.create("oldAccess", "refresh123", 3600L, "Bearer").fold(t -> t, _ -> null);
-            var newToken = Token.create("newAccess", "refresh123", 3600L, "Bearer").fold(t -> t, _ -> null);
-
-            when(tokenRepository.findBySessionId("session123")).thenReturn(Result.success(oldToken));
-            when(oauthClient.refreshToken("refresh123")).thenReturn(Result.success(newToken));
-            when(tokenRepository.save("session123", newToken)).thenReturn(Result.successVoid());
-
-            var result = authenticationService.refreshToken("session123");
-
-            assertThat(result.isSuccess()).isTrue();
-            assertThat(result.fold(Token::accessToken, err -> null)).isEqualTo("newAccess");
-
-            verify(tokenRepository).findBySessionId("session123");
-            verify(oauthClient).refreshToken("refresh123");
-            verify(tokenRepository).save("session123", newToken);
-        }
-
-        @Test
-        void shouldFailWhenNoRefreshToken() {
-            var token = Token.create("access123", null, 3600L, "Bearer").fold(t -> t, _ -> null);
-            when(tokenRepository.findBySessionId("session123")).thenReturn(Result.success(token));
-
-            var result = authenticationService.refreshToken("session123");
-
-            assertThat(result.isFailure()).isTrue();
-            Error error = result.fold(success -> null, err -> err);
-            assertThat(error).isInstanceOf(Error.AuthenticationError.class);
-            verifyNoInteractions(oauthClient);
-        }
-
-        @Test
-        void shouldFailWhenTokenNotFound() {
-            when(tokenRepository.findBySessionId("invalidSession"))
-                    .thenReturn(Result.failure(Error.resourceNotFoundError("Token", "invalidSession")));
-
-            var result = authenticationService.refreshToken("invalidSession");
-
-            assertThat(result.isFailure()).isTrue();
-            Error error = result.fold(success -> null, err -> err);
-            assertThat(error).isInstanceOf(Error.ResourceNotFoundError.class);
-            verifyNoInteractions(oauthClient);
-        }
-
-        @Test
-        void shouldFailWhenOAuthRefreshFails() {
-            var oldToken = Token.create("oldAccess", "refresh123", 3600L, "Bearer").fold(t -> t, _ -> null);
-            when(tokenRepository.findBySessionId("session123")).thenReturn(Result.success(oldToken));
-            when(oauthClient.refreshToken("refresh123"))
-                    .thenReturn(Result.failure(Error.tokenExchangeError("Refresh failed", "Token revoked")));
-
-            var result = authenticationService.refreshToken("session123");
-
-            assertThat(result.isFailure()).isTrue();
-            Error error = result.fold(success -> null, err -> err);
-            assertThat(error).isInstanceOf(Error.TokenExchangeError.class);
-            verify(tokenRepository, never()).save(anyString(), any());
-        }
-
-        @Test
-        void shouldFailWhenSaveNewTokenFails() {
-            var oldToken = Token.create("oldAccess", "refresh123", 3600L, "Bearer").fold(t -> t, _ -> null);
-            var newToken = Token.create("newAccess", "refresh123", 3600L, "Bearer").fold(t -> t, _ -> null);
-
-            when(tokenRepository.findBySessionId("session123")).thenReturn(Result.success(oldToken));
-            when(oauthClient.refreshToken("refresh123")).thenReturn(Result.success(newToken));
-            when(tokenRepository.save("session123", newToken))
-                    .thenReturn(Result.failure(Error.externalServiceError("Session", "Write failed", null)));
-
-            var result = authenticationService.refreshToken("session123");
+            var result = authenticationService.exchangeCodeForToken(request);
 
             assertThat(result.isFailure()).isTrue();
             Error error = result.fold(success -> null, err -> err);
