@@ -1,7 +1,7 @@
 package com.example.youtube.search.application.impl;
 
+import com.example.youtube.auth.application.TokenQuery;
 import com.example.youtube.auth.domain.entity.Token;
-import com.example.youtube.auth.domain.repository.TokenRepository;
 import com.example.youtube.common.result.Error;
 import com.example.youtube.common.result.Result;
 import com.example.youtube.quota.domain.service.QuotaService;
@@ -19,29 +19,29 @@ public class SearchService implements SearchUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(SearchService.class);
 
-    private final TokenRepository tokenRepository;
+    private final TokenQuery tokenQuery;
     private final YouTubeSearchPort youtubeSearchPort;
     private final QuotaService quotaService;
 
     public SearchService(
-            TokenRepository tokenRepository,
+            TokenQuery tokenQuery,
             YouTubeSearchPort youtubeSearchPort,
             QuotaService quotaService
     ) {
-        this.tokenRepository = tokenRepository;
+        this.tokenQuery = tokenQuery;
         this.youtubeSearchPort = youtubeSearchPort;
         this.quotaService = quotaService;
     }
 
     @Override
-    public Result<List<SearchResult>, Error> searchVideos(String sessionId, SearchRequest request) {
+    public Result<List<SearchResult>, Error> searchVideos(SearchRequest request) {
         log.info("Searching videos with query: {}", request.query());
 
         if (request.query() == null || request.query().isBlank()) {
             return Result.failure(Error.invalidInputError("query", "Search query is required"));
         }
 
-        return validateAndGetToken(sessionId)
+        return tokenQuery.getCurrentUserToken()
                 .flatMap(token -> quotaService.consumeQuota(QuotaService.SEARCH_LIST_COST)
                         .flatMap(_ -> youtubeSearchPort.searchVideos(
                                 token.accessToken(),
@@ -54,7 +54,7 @@ public class SearchService implements SearchUseCase {
     }
 
     @Override
-    public Result<SearchResult, Error> searchMusicVideo(String sessionId, MusicSearchRequest request) {
+    public Result<SearchResult, Error> searchMusicVideo(MusicSearchRequest request) {
         log.info("Searching music video: {} by {}", request.trackName(), request.artistName());
 
         if (request.trackName() == null || request.trackName().isBlank()) {
@@ -65,25 +65,12 @@ public class SearchService implements SearchUseCase {
             return Result.failure(Error.invalidInputError("artistName", "Artist name is required"));
         }
 
-        return validateAndGetToken(sessionId)
+        return tokenQuery.getCurrentUserToken()
                 .flatMap(token -> quotaService.consumeQuota(QuotaService.SEARCH_LIST_COST)
                         .flatMap(_ -> youtubeSearchPort.searchMusicVideo(
                                 token.accessToken(),
                                 request.trackName(),
                                 request.artistName()
                         )));
-    }
-
-    private Result<Token, Error> validateAndGetToken(String sessionId) {
-        return tokenRepository.findBySessionId(sessionId)
-                .flatMap(token -> {
-                    if (!token.isValid()) {
-                        return Result.failure(Error.authenticationError(
-                                "Token is invalid or expired",
-                                "Please re-authenticate"
-                        ));
-                    }
-                    return Result.success(token);
-                });
     }
 }

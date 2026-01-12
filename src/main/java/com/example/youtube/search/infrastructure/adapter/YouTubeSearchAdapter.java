@@ -47,6 +47,9 @@ public class YouTubeSearchAdapter implements YouTubeSearchPort {
                     .setOrder("relevance")
                     .execute();
 
+            log.info("YouTube API response for query '{}': {} items", query,
+                    response.getItems() != null ? response.getItems().size() : 0);
+
             List<SearchResult> results = new ArrayList<>();
             if (response.getItems() != null) {
                 int position = 0;
@@ -70,6 +73,7 @@ public class YouTubeSearchAdapter implements YouTubeSearchPort {
                 }
             }
 
+            log.info("Returning {} search results for query '{}'", results.size(), query);
             return Result.success(results);
         } catch (GoogleJsonResponseException e) {
             return handleGoogleError(e, "search videos");
@@ -82,9 +86,11 @@ public class YouTubeSearchAdapter implements YouTubeSearchPort {
     @Override
     public Result<SearchResult, Error> searchMusicVideo(String accessToken, String trackName, String artistName) {
         String query = buildMusicSearchQuery(trackName, artistName);
+        log.info("Searching music video with query: '{}'", query);
 
         return searchVideos(accessToken, query, 5)
                 .flatMap(results -> {
+                    log.info("Got {} results for '{} by {}'", results.size(), trackName, artistName);
                     if (results.isEmpty()) {
                         return Result.failure(Error.resourceNotFoundError(
                                 "Music video",
@@ -92,8 +98,12 @@ public class YouTubeSearchAdapter implements YouTubeSearchPort {
                         ));
                     }
 
-                    return results.stream()
+                    var musicVideos = results.stream()
                             .filter(SearchResult::isLikelyMusicVideo)
+                            .toList();
+                    log.info("After isLikelyMusicVideo filter: {} results", musicVideos.size());
+
+                    return musicVideos.stream()
                             .findFirst()
                             .map(Result::<SearchResult, Error>success)
                             .orElseGet(() -> Result.success(results.getFirst()));

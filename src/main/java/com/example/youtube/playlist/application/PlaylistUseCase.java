@@ -16,11 +16,11 @@ public interface PlaylistUseCase {
 
     record GetVideosRequest(String playlistId, int maxResults, String pageToken) {}
 
-    Result<List<YouTubePlaylist>, Error> getUserPlaylists(String sessionId);
+    Result<List<YouTubePlaylist>, Error> getUserPlaylists();
 
-    Result<PageResult<YouTubeVideo>, Error> getPlaylistVideos(String sessionId, GetVideosRequest request);
+    Result<PageResult<YouTubeVideo>, Error> getPlaylistVideos(GetVideosRequest request);
 
-    Result<YouTubePlaylist, Error> createPlaylist(String sessionId, CreatePlaylistRequest request);
+    Result<YouTubePlaylist, Error> createPlaylist(CreatePlaylistRequest request);
 
-    Result<Void, Error> addVideosToPlaylist(String sessionId, AddVideosRequest request);
+    Result<Void, Error> addVideosToPlaylist(AddVideosRequest request);
 }

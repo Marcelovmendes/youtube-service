@@ -21,7 +21,7 @@ public interface SearchUseCase {
 
     record MusicSearchRequest(String trackName, String artistName) {}
 
-    Result<List<SearchResult>, Error> searchVideos(String sessionId, SearchRequest request);
+    Result<List<SearchResult>, Error> searchVideos(SearchRequest request);
 
-    Result<SearchResult, Error> searchMusicVideo(String sessionId, MusicSearchRequest request);
+    Result<SearchResult, Error> searchMusicVideo(MusicSearchRequest request);
 }
