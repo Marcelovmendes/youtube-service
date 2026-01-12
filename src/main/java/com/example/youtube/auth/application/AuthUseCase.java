@@ -12,7 +12,5 @@ public interface AuthUseCase {
 
     Result<AuthInitiationResponse, Error> initiateAuthentication();
 
-    Result<Token, Error> handleCallback(AuthCallbackRequest request);
-
-    Result<Token, Error> refreshToken(String sessionId);
+    Result<Token, Error> exchangeCodeForToken(AuthCallbackRequest request);
 }
