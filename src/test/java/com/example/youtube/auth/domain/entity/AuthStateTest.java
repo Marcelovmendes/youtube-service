@@ -147,4 +147,33 @@ class AuthStateTest {
         assertThat(state2).isNotBlank();
         assertThat(state1).isNotEqualTo(state2);
     }
+
+    @Test
+    void shouldNotBeProcessedByDefault() {
+        var authState = switch (AuthState.create("state123", "verifier456", "challenge789")) {
+            case Result.Success(var value) -> value;
+            case Result.Failure(_) -> null;
+        };
+
+        assertThat(authState).isNotNull();
+        assertThat(authState.isProcessed()).isFalse();
+        assertThat(authState.processedToken()).isNull();
+    }
+
+    @Test
+    void shouldCreateProcessedAuthState() {
+        var authState = switch (AuthState.create("state123", "verifier456", "challenge789")) {
+            case Result.Success(var value) -> value;
+            case Result.Failure(_) -> null;
+        };
+
+        var token = Token.fromAccessToken("access123");
+        var processedState = authState.withProcessedToken(token);
+
+        assertThat(processedState.isProcessed()).isTrue();
+        assertThat(processedState.processedToken()).isEqualTo(token);
+        assertThat(processedState.stateValue()).isEqualTo("state123");
+        assertThat(processedState.codeVerifier()).isEqualTo("verifier456");
+        assertThat(processedState.codeChallenge()).isEqualTo("challenge789");
+    }
 }

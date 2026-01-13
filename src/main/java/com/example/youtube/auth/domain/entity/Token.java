@@ -36,6 +36,10 @@ public final class Token {
         return new Token(accessToken, null, Instant.now().plusSeconds(3600), "Bearer");
     }
 
+    public static Token fromStoredData(String accessToken, String refreshToken, Instant expiresAt, String tokenType) {
+        return new Token(accessToken, refreshToken, expiresAt, tokenType);
+    }
+
     public boolean isExpired() {
         return Instant.now().isAfter(expiresAt);
     }

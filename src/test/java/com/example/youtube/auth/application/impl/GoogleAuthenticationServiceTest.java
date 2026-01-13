@@ -127,7 +127,7 @@ class GoogleAuthenticationServiceTest {
         void shouldSucceed() {
             when(authStateRepository.findByStateValue("state123")).thenReturn(Result.success(validAuthState));
             when(oauthClient.exchangeCodeForToken("code123", "verifier123")).thenReturn(Result.success(validToken));
-            when(authStateRepository.remove("state123")).thenReturn(Result.successVoid());
+            when(authStateRepository.markAsProcessed("state123", validToken)).thenReturn(Result.successVoid());
 
             var request = new AuthUseCase.AuthCallbackRequest("code123", "state123");
             var result = authenticationService.exchangeCodeForToken(request);
@@ -137,7 +137,7 @@ class GoogleAuthenticationServiceTest {
 
             verify(authStateRepository).findByStateValue("state123");
             verify(oauthClient).exchangeCodeForToken("code123", "verifier123");
-            verify(authStateRepository).remove("state123");
+            verify(authStateRepository).markAsProcessed("state123", validToken);
         }
 
         @Test
@@ -166,22 +166,23 @@ class GoogleAuthenticationServiceTest {
             assertThat(result.isFailure()).isTrue();
             Error error = result.fold(success -> null, err -> err);
             assertThat(error).isInstanceOf(Error.TokenExchangeError.class);
-            verify(authStateRepository, never()).remove(anyString());
+            verify(authStateRepository, never()).markAsProcessed(anyString(), any(Token.class));
         }
 
         @Test
-        void shouldFailWhenRemoveStateFails() {
-            when(authStateRepository.findByStateValue("state123")).thenReturn(Result.success(validAuthState));
-            when(oauthClient.exchangeCodeForToken("code123", "verifier123")).thenReturn(Result.success(validToken));
-            when(authStateRepository.remove("state123"))
-                    .thenReturn(Result.failure(Error.externalServiceError("Redis", "Connection lost", null)));
+        void shouldReturnCachedTokenWhenStateAlreadyProcessed() {
+            var processedAuthState = validAuthState.withProcessedToken(validToken);
+            when(authStateRepository.findByStateValue("state123")).thenReturn(Result.success(processedAuthState));
 
             var request = new AuthUseCase.AuthCallbackRequest("code123", "state123");
             var result = authenticationService.exchangeCodeForToken(request);
 
-            assertThat(result.isFailure()).isTrue();
-            Error error = result.fold(success -> null, err -> err);
-            assertThat(error).isInstanceOf(Error.ExternalServiceError.class);
+            assertThat(result.isSuccess()).isTrue();
+            assertThat(result.fold(Token::accessToken, err -> null)).isEqualTo("access123");
+
+            verify(authStateRepository).findByStateValue("state123");
+            verifyNoInteractions(oauthClient);
+            verify(authStateRepository, never()).markAsProcessed(anyString(), any(Token.class));
         }
     }
 }

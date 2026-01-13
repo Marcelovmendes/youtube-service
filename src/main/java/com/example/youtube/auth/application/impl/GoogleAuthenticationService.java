@@ -46,8 +46,14 @@ public class GoogleAuthenticationService implements AuthUseCase {
     @Override
     public Result<Token, Error> exchangeCodeForToken(AuthCallbackRequest request) {
         return authStateRepository.findByStateValue(request.state())
-                .flatMap(authState -> authState.validateState(request.state())
-                        .flatMap(_ -> oauthClient.exchangeCodeForToken(request.code(), authState.codeVerifier()))
-                        .andThen(_ -> authStateRepository.remove(request.state())));
+                .flatMap(authState -> {
+                    if (authState.isProcessed()) {
+                        return Result.success(authState.processedToken());
+                    }
+
+                    return authState.validateState(request.state())
+                            .flatMap(_ -> oauthClient.exchangeCodeForToken(request.code(), authState.codeVerifier()))
+                            .andThen(token -> authStateRepository.markAsProcessed(request.state(), token));
+                });
     }
 }

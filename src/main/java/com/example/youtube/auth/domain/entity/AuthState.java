@@ -11,11 +11,13 @@ public final class AuthState {
     private final String stateValue;
     private final String codeVerifier;
     private final String codeChallenge;
+    private final Token processedToken;
 
-    private AuthState(String stateValue, String codeVerifier, String codeChallenge) {
+    private AuthState(String stateValue, String codeVerifier, String codeChallenge, Token processedToken) {
         this.stateValue = stateValue;
         this.codeVerifier = codeVerifier;
         this.codeChallenge = codeChallenge;
+        this.processedToken = processedToken;
     }
 
     public static Result<AuthState, Error> create(String stateValue, String codeVerifier, String codeChallenge) {
@@ -31,7 +33,7 @@ public final class AuthState {
             return Result.failure(Error.invalidInputError("codeChallenge", "Code challenge cannot be null or empty"));
         }
 
-        return Result.success(new AuthState(stateValue, codeVerifier, codeChallenge));
+        return Result.success(new AuthState(stateValue, codeVerifier, codeChallenge, null));
     }
 
     public static String generateRandomState() {
@@ -63,5 +65,17 @@ public final class AuthState {
 
     public String codeChallenge() {
         return codeChallenge;
+    }
+
+    public boolean isProcessed() {
+        return processedToken != null;
+    }
+
+    public Token processedToken() {
+        return processedToken;
+    }
+
+    public AuthState withProcessedToken(Token token) {
+        return new AuthState(stateValue, codeVerifier, codeChallenge, token);
     }
 }
