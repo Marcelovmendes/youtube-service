@@ -1,5 +1,6 @@
 package com.example.youtube.common.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
@@ -12,12 +13,26 @@ import org.springframework.session.web.http.DefaultCookieSerializer;
 @EnableRedisHttpSession(maxInactiveIntervalInSeconds = 1800)
 public class SessionConfig {
 
+    @Value("${session.cookie.domain:}")
+    private String cookieDomain;
+
+    @Value("${session.cookie.same-site:Lax}")
+    private String cookieSameSite;
+
+    @Value("${session.cookie.secure:false}")
+    private boolean cookieSecure;
+
     @Bean
     public CookieSerializer cookieSerializer() {
         DefaultCookieSerializer serializer = new DefaultCookieSerializer();
         serializer.setCookieName("YOUTUBE_SESSION");
         serializer.setCookiePath("/");
         serializer.setUseHttpOnlyCookie(true);
+        serializer.setSameSite(cookieSameSite);
+        serializer.setUseSecureCookie(cookieSecure);
+        if (!cookieDomain.isEmpty()) {
+            serializer.setDomainNamePattern("^.+?(\\w+\\.\\w+)$");
+        }
         return serializer;
     }
 

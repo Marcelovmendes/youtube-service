@@ -7,16 +7,22 @@ import com.example.youtube.common.result.ResultMapper;
 import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/v1/auth")
 public class AuthenticationController {
 
     private static final Logger log = LoggerFactory.getLogger(AuthenticationController.class);
-    private static final String FRONTEND_URL = "http://localhost:3000/auth/youtube/callback";
+
+    @Value("${frontend.url:http://localhost:3000}")
+    private String frontendBaseUrl;
 
     private final AuthUseCase authUseCase;
     private final TokenQuery tokenQuery;
@@ -26,13 +32,17 @@ public class AuthenticationController {
         this.tokenQuery = tokenQuery;
     }
 
+    private String buildRedirectHtml(String url) {
+        return "<!DOCTYPE html><html><body><script>window.location.replace(\"" + url + "\");</script></body></html>";
+    }
+
     @GetMapping
     public ResponseEntity<?> initiateAuthentication() {
         return ResultMapper.ok(authUseCase.initiateAuthentication());
     }
 
     @GetMapping("/google/callback")
-    public ResponseEntity<Void> handleCallback(
+    public ResponseEntity<String> handleCallback(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error,
@@ -44,9 +54,10 @@ public class AuthenticationController {
 
         if (error != null) {
             log.error("OAuth provider returned error: {}", error);
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .header("Location", FRONTEND_URL + "?status=error&message=" + error)
-                    .build();
+            String encoded = URLEncoder.encode(error, StandardCharsets.UTF_8);
+            return ResponseEntity.ok()
+                    .header("Content-Type", "text/html")
+                    .body(buildRedirectHtml(frontendBaseUrl + "/auth/youtube/callback?status=error&message=" + encoded));
         }
 
         return authUseCase.exchangeCodeForToken(
@@ -56,15 +67,16 @@ public class AuthenticationController {
                     tokenQuery.storeUserToken(session.getId(), token);
                     log.info("Authentication successful - Token stored in session: {}", session.getId());
                     log.info("Session isNew: {}, maxInactiveInterval: {}", session.isNew(), session.getMaxInactiveInterval());
-                    return ResponseEntity.status(HttpStatus.FOUND)
-                            .header("Location", FRONTEND_URL + "?status=success")
-                            .build();
+                    return ResponseEntity.ok()
+                            .header("Content-Type", "text/html")
+                            .body(buildRedirectHtml(frontendBaseUrl + "/auth/youtube/callback?status=success"));
                 },
                 authError -> {
                     log.error("Authentication failed: {}", authError.message());
-                    return ResponseEntity.status(HttpStatus.FOUND)
-                            .header("Location", FRONTEND_URL + "?status=error&message=" + authError.message())
-                            .build();
+                    String encoded = URLEncoder.encode(authError.message(), StandardCharsets.UTF_8);
+                    return ResponseEntity.ok()
+                            .header("Content-Type", "text/html")
+                            .body(buildRedirectHtml(frontendBaseUrl + "/auth/youtube/callback?status=error&message=" + encoded));
                 }
         );
     }
